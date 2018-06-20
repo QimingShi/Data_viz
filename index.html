@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js" integrity="sha384-b/U6ypiBEHpOf/4+1nzFpr53nxSS+GLCkfwBdFNTxtclqqenISfwAzpKaMNFNmj4" crossorigin="anonymous"></script>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+    <script src="https://d3js.org/topojson.v2.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-h0AbiXch4ZDo7tp9hKZ4TsHbi047NrKGLO3SEJAg45jXxnGIfYzk4Si90RDIqNm1" crossorigin="anonymous"></script>
+</head>
+<style>
+    .g-category-group { fill: #e8e7dc; }
+
+    .subunit-boundary {
+        stroke: #866565;
+        /*stroke-dasharray: 0,0;*/
+        /*stroke-linejoin: round;*/
+        stroke-width: 1;
+    }
+
+    div.tooltip {
+        position: absolute;
+        text-align: center;
+        width: 80px;
+        height: 18px;
+        padding: 2px;
+        font: 12px sans-serif;
+        background: rgba(10, 10, 10, 0.75);
+        color: #fff;
+        border: 0px;
+        border-radius: 8px;
+        pointer-events: none;
+    }
+
+    .logoCol {
+        height: 100px;
+        top: 450px;
+    }
+
+    .arc text {
+        font: 10px sans-serif;
+        text-anchor: middle;
+    }
+
+    .arc path {
+        stroke: #fff;
+    }
+
+    #toggleContainer {
+        text-align: center;
+        position: relative;
+        top: 500px;
+        left: 450px;
+    }
+
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 34px;
+    }
+
+    /* Hide default HTML checkbox */
+    .switch input {display:none;}
+
+    /* The slider */
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        -webkit-transition: .4s;
+        transition: .4s;
+    }
+
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 26px;
+        width: 26px;
+        left: 4px;
+        bottom: 4px;
+        background-color: white;
+        -webkit-transition: .4s;
+        transition: .4s;
+    }
+    .td {
+        border: 1px solid #ffdb6b;
+    }
+    input:checked + .slider {
+        background-color: #900;
+    }
+
+    input:focus + .slider {
+        box-shadow: 0 0 1px #900;
+    }
+
+    input:checked + .slider:before {
+        -webkit-transform: translateX(26px);
+        -ms-transform: translateX(26px);
+        transform: translateX(26px);
+    }
+
+    /* Rounded sliders */
+    .slider.round {
+        border-radius: 34px;
+    }
+
+    .slider.round:before {
+        border-radius: 50%;
+    }
+
+    label {
+        border:1px solid #ccc;
+        padding:10px;
+        margin:0 0 10px;
+        display:block;
+    }
+
+    label:hover {
+        background:#eee;
+        cursor:pointer;
+    }
+
+</style>
+<body>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-2" id="area3">
+        </div>
+        <div class="col-8 " id = "area1">
+        </div>
+        <div>
+            <div class="col-2 logoCol" id = "area4">
+            </div>
+            <div>
+                <tr>
+                    <td><label class="switch">
+                        <input id="rodent_toggle" type="checkbox">
+                        <div class="slider round"></div>
+                    </label></td>
+                </tr>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    var diab_prop = [0, 0.062, 0.073, 0.081, 0.093,0.152];
+    var diab_color = d3.scaleThreshold()
+        .domain(diab_prop)
+        .range(["#fafafa", "#549319",'#ffdf2c',"#f8951e","#e75113","#d7000b"]);
+    var diabeteData = d3.map();
+
+    d3.queue()
+    //using the website converter to convert shapefile to topojson (choose wgs84 as crs), then change .topojson to .json. Ready to go here
+        .defer(d3.json, "Export_Output.json")
+                //      for color mapping, read a scv file here
+        //output shapefile to text and the import it as csv, then save it. Ready to go
+        .defer(d3.csv, "d.csv", function(d){
+            diabeteData.set(d.GEOID10, +d.PropDiab);
+        })
+        .await(ready);
+
+
+    function ready(error, data) {
+
+        if (error) throw error;
+
+        d3.csv("d.csv", function(error, data){
+            if (error) throw error;
+            USDataforMap = data[0];
+            csv_data = data.slice(1);
+//            console.log(csv_data);
+        });
+
+        // Massachusetts topojson
+        var Mass = topojson.feature(data, {
+            type: "GeometryCollection",
+            geometries: data.objects.Export_Output.geometries
+        });
+//        console.log(data);
+//        console.log(Mass);
+//        console.log(Mass.features);
+//        console.log(Mass.features[0].properties.NAMELSAD10);
+
+        // projection and path
+        var projection = d3.geoMercator()
+            .fitExtent([[30, 20], [1060, 580]], Mass);
+
+        var geoPath = d3.geoPath()
+            .projection(projection);
+
+        var div = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        var width = 960,
+            height = 600;
+        var centered;
+
+        var legendText = ["0 - 0.062", "0.062 - 0.073", "0.073 - 0.081", "0.081 - 0.093", "0.093 - 0.152"];
+
+        var svg_map = d3.select("#area1")
+            .append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        var map = svg_map.append("g")
+            .selectAll("path")
+            .data(Mass.features)
+            .enter()
+            .append("path")
+            .attr("d", geoPath)
+            .attr("class","subunit-boundary")
+            .attr("fill", function(d){
+                return diab_color(d.GEOID10 = diabeteData.get(d.properties.GEOID10));
+            });
+
+        var label = svg_map.append("g");
+//        console.log(Mass.features);
+        label.selectAll( "text" )
+            .data(Mass.features)
+            .enter()
+            .append( "svg:text" )
+            .text(function(d){
+                return d.properties.TownName;
+            })
+            .attr( "fill", "#030303" )
+//            .attr( "stroke", "#999" )
+            .attr("x", function(d){
+                return geoPath.centroid(d)[0];
+            })
+            .attr("y", function(d){
+                return  geoPath.centroid(d)[1];
+            })
+            .attr("text-anchor","middle")
+            .attr('font-size','8pt')
+//            .attr('stroke', '#d3d3d3')
+            .attr( "class", "incident")
+            .attr( "visibility", "hidden");
+
+        map.on("mouseover", function(d){
+                d3.select(this).style('fill', "#ffd8c5").transition().duration(500)
+                    .style('fill',function(d){return diab_color(d.GEOID10 = diabeteData.get(d.properties.GEOID10));});
+                div.transition()
+                    .duration(200)
+                    .style("opacity", .9);
+                div.text(d.GEOID10)
+                    .style("left", (d3.event.pageX) + "px")
+                    .style("top", (d3.event.pageY - 28) + "px");
+                for(var i = 0; i <csv_data.length; i++){
+                    //d is the data from mouse, if == statename, popup "DrawMapHoverCharts"
+                    if(csv_data[i].GEOID10 == d.properties.GEOID10){
+                        InitialHoverCharts();
+                        DrawMapHoverCharts(csv_data[i]);
+//                        DrawKPI(csv_data[i]);
+//                        console.log(csv_data[i]);
+                    }
+                };
+            })
+            .on("mouseout", function(d){
+                div.transition()
+                    .duration(500)
+                    .style("opacity", 0);
+                d3.selectAll('path').style('fill',function(d){
+                    return diab_color(d.GEOID10 = diabeteData.get(d.properties.GEOID10));
+                });
+            })
+            .on("click",function(d){
+                var x, y, zoomLevel;
+                if (d && centered !== d) {
+                    var centroid = geoPath.centroid(d);
+                    x = centroid[0];
+                    y = centroid[1];
+                    zoomLevel = 3;
+                    centered = d;
+                } else {
+                    x = width / 2;
+                    y = height / 2;
+                    zoomLevel = 1;
+                    centered = null;
+                }
+                //make transition to both map and label on the top of the map
+                map.transition()
+                    .duration(20)
+                    //                    .ease(d3.easeCubicOut)
+                    .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + zoomLevel + ")translate(" + -x + "," + -y + ")")
+                    .style("stroke-width", 1.5 / zoomLevel + "px");
+                label.transition()
+                    .duration(20)
+                    //                    .ease(d3.easeCubicOut)
+                    .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")scale(" + zoomLevel + ")translate(" + -x + "," + -y + ")")
+                    .style("stroke-width", 1.5 / zoomLevel + "px");
+            });
+
+        var legend = d3.select("#area4").append("svg")
+            .attr("width", 200)
+            .attr("height", 200)
+            .selectAll("g")
+            .data(diab_color.domain().slice(0,5))
+            .enter()
+            .append("g")
+            .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+        legend.append("rect")
+            .attr("width", 16)
+            .attr("height", 16)
+            .style("fill", diab_color);
+
+        legend.append("text")
+            .data(legendText)
+            .attr("x", 24)
+            .attr("y", 9)
+            .attr("dy", ".35em")
+            .text(function(d) { return d; });
+
+        //toggelling layer controller
+        var rodentsCheckbox = document.querySelector('input[id="rodent_toggle"]');
+        rodentsCheckbox.onchange = function() {
+            if(this.checked) {
+                d3.selectAll(".incident").attr("visibility", "visible");
+            } else {
+                d3.selectAll(".incident").attr("visibility", "hidden");
+            }}
+    }
+
+    function StringtoPercentage(str){
+        return parseFloat(str)/100;
+    }
+
+//Data processing for all functions to be used after, put data together as a dictionary
+    function DrawMapHoverCharts(data){
+        var GrouplistinArray = [];
+        var grouplist = ["Percent_hi", "PropWhite"];
+        var tempdata = {};
+
+        var KPIArray = [];
+        var list_KPI = ["Diabete", "Count_"];
+        var KPIdata = {};
+
+        var PIEArray = [];
+        var list_PIE = ["6_dia", "67_dia", "78_dia", "8_dia", "null_dia"];
+        var PIEdata = {};
+
+        for(var key2 in data){
+            if (key2 == "6_dia"){
+                PIEdata[key2] = parseFloat(data[key2]).toFixed(3)
+            }if (key2 == "67_dia"){
+                PIEdata[key2] = parseFloat(data[key2]).toFixed(3)
+            }if (key2 == "78_dia"){
+                PIEdata[key2] = parseFloat(data[key2]).toFixed(3)
+            }if (key2 == "8_dia"){
+                PIEdata[key2] = parseFloat(data[key2]).toFixed(3)
+            }if (key2 == "null_dia"){
+                PIEdata[key2] = parseFloat(data[key2]).toFixed(3)
+            }else{
+
+            }
+        }
+        for(var k in list_PIE){
+            var itemdict_PIE ={};
+            itemdict_PIE["category3"] = list_PIE[k];
+            itemdict_PIE["num"] = (PIEdata[list_PIE[k]]*1).toFixed(3);
+            PIEArray.push(itemdict_PIE)
+        }
+//        console.log(PIEArray);
+
+        for(var key in data){
+            if (key == "Percent_hi"){
+                tempdata[key] = StringtoPercentage(data[key]).toFixed(3);
+            }else if(key == "PropWhite"){
+                tempdata[key] = parseFloat(data[key]).toFixed(3)
+            }else{
+            }
+        }
+        for(var j in grouplist){
+            var itemdict ={};
+            itemdict["category"] = grouplist[j];
+            itemdict["num"] = (tempdata[grouplist[j]]*100).toFixed(1);
+            itemdict["num2"] = 100;
+            GrouplistinArray.push(itemdict)
+        }
+
+        for(var key1 in data){
+            if (key1 == "Diabete"){
+                KPIdata[key1] = parseFloat(data[key1]).toFixed(0)
+            }if (key1 == "Count_"){
+                KPIdata[key1] = parseFloat(data[key1]).toFixed(0)
+            }else{
+            }
+        }
+        for(var i in list_KPI){
+            var itemdict_KPI ={};
+            itemdict_KPI["category2"] = grouplist[i];
+            itemdict_KPI["num"] = (tempdata[grouplist[i]]*100).toFixed(1);
+            KPIArray.push(itemdict_KPI)
+        }
+//        console.log(KPIArray);
+        DrawKPI(KPIdata);
+        DrawPie(PIEArray);
+        //something wrong here
+        DrawBar(tempdata, tempdata.GEOID10, GrouplistinArray);
+
+    }
+
+    function DrawKPI(data){
+
+        var svg_kpi = d3.select("#area3")
+            .append("svg").attr("id", "drawKPIlabel")
+            .attr("width", 300)
+            .attr("height", 50)
+            .append("g");
+
+        var svgtext = svg_kpi
+            .append("text")
+            .attr("x", 120)
+            .attr("y", 30)
+            .attr("text-anchor", "middle")
+            .style("fill","#a6bddb");
+
+        svgtext.text(function(){
+                return "Diabetes Patients"
+            }
+        )
+            .attr("font-size", "30px");
+
+        var svg_kpi = d3.select("#area3")
+            .append("svg").attr("id", "drawKPI")
+            .attr("width", 300)
+            .attr("height", 90)
+            .append("g");
+
+        var svgtext = svg_kpi
+            .append("text")
+            .attr("x", 110)
+            .attr("y", 60)
+            .attr("text-anchor", "middle")
+            .style("fill","darkOrange");
+
+        svgtext.text(function(){
+            return data.Diabete
+            }
+        )
+            .attr("font-size", "60px");
+
+        var svg_kpi = d3.select("#area3")
+            .append("svg").attr("id", "drawKPIlabel2")
+            .attr("width", 300)
+            .attr("height", 50)
+            .append("g");
+
+        var svgtext = svg_kpi
+            .append("text")
+            .attr("x", 120)
+            .attr("y", 30)
+            .attr("text-anchor", "middle")
+            .style("fill","#a6bddb");
+
+        svgtext.text(function(){
+                return "Total Patients"
+            }
+        )
+            .attr("font-size", "30px");
+
+        var svg_kpi2 = d3.select("#area3")
+            .append("svg").attr("id", "drawKPI2")
+            .attr("width", 300)
+            .attr("height", 90);
+//            .append("g");
+
+        var svgtext2 = svg_kpi2
+            .append("text")
+            .attr("x", 110)
+            .attr("y", 60)
+            .attr("text-anchor", "middle")
+            .style("fill","darkOrange");
+
+        svgtext2.text(function(){
+                return data.Count_
+            }
+        )
+            .attr("font-size", "60px");
+    }
+
+    function DrawBar(votenum, state, data){
+//        console.log(data);
+        var headline = state + " " + votenum + " VOTES";
+        var margin = {top: 20, right: 50, bottom: 20, left: 227};
+        var width = 900 - margin.left - margin.right,
+            height = 120 - margin.top - margin.bottom;
+        var barHeight = 20;
+        //Appends the svg to the chart-container div
+        var svg = d3.select("#area1").append("svg").attr("id", "hoverbarsvg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+        var xScale = d3.scaleLinear()
+            .range([0,width]);
+
+        var y0 = d3.scaleBand()
+            .rangeRound([height, 0], 0)
+            .domain(["Percent_hi", "PropWhite"]);
+
+        var xAxis = d3.axisBottom(xScale).tickFormat(function(d){return d + "%"; }).tickSize(height);
+        var yAxis = d3.axisLeft(y0);
+        var maxX = 100;
+        var minX = 0;
+        xScale.domain([0, maxX ]);
+
+        var yAxisGroup = svg.append("g")
+            .attr("class", "y axis")
+            .call(yAxis)
+            .attr("stroke", "#252525")
+            .attr("opacity", "0.7")
+            .attr("transform", function(d) {
+                return "translate(0,-20)";
+            });
+
+        //Appends the x axis
+        var xAxisGroup = svg.append("g")
+            .attr("class", "x axis")
+            .call(xAxis)
+            .attr("stroke", "#252525")
+            .attr("opacity", "0.7")
+            .attr("transform", function(d) {
+                return "translate(0,-20)";
+            });
+
+        //Binds the data to the bars
+        var categoryGroup = svg.selectAll(".g-category-group")
+            .data(data)
+            .enter()
+            .append("g")
+            .attr("class", "g-category-group")
+            .attr("transform", function(d) {
+//                 console.log(d)
+                return "translate(0," + y0(d.category) + ")";
+            });
+
+        //Appends background bar
+        var bars2 = categoryGroup.append("rect")
+            .attr("width", function(d) { return xScale(d.num2); })
+            .attr("height", barHeight - 1 )
+            .attr("class", "g-num2")
+            .style('fill', "#e8e7dc")
+            .attr("transform", "translate(0,-10)");
+
+        //Appends main bar
+        var bars = categoryGroup.append("rect")
+            .attr("width", function(d) { return xScale(d.num); })
+            .attr("height", barHeight - 1 )
+            .attr("class", "g-num")
+            .style('fill', "#feb24c")
+            .attr("transform", "translate(0,-10)");
+
+        //Binds data to labels
+        var labelGroup = svg.selectAll("g-num")
+            .data(data)
+            .enter()
+            .append("g")
+            .attr("class", "g-label-group")
+            .style('fill', "#b4b2aa")
+            .attr("transform", function(d) {
+                return "translate(0," + y0(d.category) + ")";
+            });
+
+        //Appends main bar labels
+        var barLabels = labelGroup.append("text")
+            .text(function(d) {return  d.num + "%";})
+            .attr("x", function(d) {
+                if (minX > 32) {
+                    return xScale(d.num) - 37;}
+                else {
+                    return xScale(d.num) + 6;}})
+            .style("fill", function(d){
+                if (minX > 32) {
+                    return "white";}
+                else {
+                    return "#696969";}})
+            .attr("y", y0.rangeRound(height,0) )
+            .attr("class", "g-labels");
+    }
+
+    function DrawPie(data){
+//        var data = [10, 20, 100];
+//        console.log(data);
+
+        var svg_kpi = d3.select("#area3")
+            .append("svg").attr("id", "Drawpielabel")
+            .attr("width", 300)
+            .attr("height", 50)
+            .append("g");
+
+        var svgtext = svg_kpi
+            .append("text")
+            .attr("x", 120)
+            .attr("y", 30)
+            .attr("text-anchor", "middle")
+            .style("fill","#a6bddb");
+
+        svgtext.text(function(){
+                return "Hba1c Group"
+            }
+        )
+            .attr("font-size", "30px");
+
+        var width = 250,
+            height = 250,
+            radius = Math.min(width, height) / 2;
+//        var colorRange = d3.scale.category20();
+//        var color = d3.scaleOrdinal((d3[categorical[0].name]));
+
+        var color = d3.scaleOrdinal()
+            .range(["#98abc5", "#8a89a6", "#7b6888"]);
+
+        var arc = d3.arc()
+            .outerRadius(radius - 10)
+            .innerRadius(radius - 80);
+
+        var labelArc = d3.arc()
+            .outerRadius(radius - 10)
+            .innerRadius(radius - 80);
+
+        var pie = d3.pie()
+            .sort(null)
+            .value(function(d) { return d.num; });
+
+        var svg = d3.select("#area3").append("svg")
+            .attr("id", "Drawpie")
+            .attr("width", width)
+            .attr("height", height)
+            .append("g")
+            .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+        var g = svg.selectAll(".arc")
+            .data(pie(data))
+            .enter().append("g")
+            .attr("class", "arc");
+
+        g.append("path")
+            .attr("d", arc)
+            .style("fill", function(d) {
+                if(d.data.category3 == "6_dia"){
+                    return "#58b647"
+                }else if(d.data.category3 == "67_dia"){
+                    return "#ffd325"
+                }else if(d.data.category3 == "78_dia"){
+                    return "#ffa43c"
+                }else if(d.data.category3 == "8_dia"){
+                    return "#d74a4c"
+                }else if(d.data.category3 == "null_dia"){
+                    return "#D3D3D3"
+                }else{
+
+                }
+            });
+//        console.log(data[0].num);
+
+
+        g.append("text")
+            .attr("transform", function(d) { return "translate(" + labelArc.centroid(d) + ")"; })
+//            .attr("dy", ".35em")
+            .style("text-anchor", "middle")
+            .text(function(d) {
+                if(d.data.category3 == "6_dia"){
+                return "<6" + ":" + (d.data.num*100).toFixed(1)+ "%";
+                }else if(d.data.category3 == "67_dia"){
+                    return "6-7"+ ":" + (d.data.num*100).toFixed(1)+ "%";
+                }else if(d.data.category3 == "78_dia"){
+                    return "7-8"+ ":" + (d.data.num*100).toFixed(1)+ "%";
+                }else if(d.data.category3 == "8_dia"){
+                    return ">8"+ ":" + (d.data.num*100).toFixed(1)+ "%";
+                }else if(d.data.category3 == "null_dia"){
+                    return "Null"+ ":" + (d.data.num*100).toFixed(1)+ "%";
+                }else{
+                }
+            })
+            .style("font-size","15px")
+            .style("fill", "white");
+
+    }
+
+
+    function InitialHoverCharts(){
+        d3.select("#Drawpielabel").remove();
+        d3.select("#drawKPIlabel").remove();
+        d3.select("#drawKPIlabel2").remove();
+        d3.select("#drawKPI").remove();
+        d3.select("#drawKPI2").remove();
+        d3.select("#hoverbarsvg").remove();
+        d3.select("#Drawpie").remove();
+    }
+
+
+</script>
+</body>
